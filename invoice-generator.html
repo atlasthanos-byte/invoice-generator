@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InvoiceForge v2</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap');
+:root{--bg:#0a0a0f;--s:#111118;--s2:#1a1a25;--bd:#2a2a3a;--ac:#6c63ff;--ac2:#ff6584;--tx:#e8e8f0;--mu:#6b6b80;--ok:#4ade80;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--tx);font-family:'DM Mono',monospace;min-height:100vh;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(108,99,255,.03)1px,transparent 1px),linear-gradient(90deg,rgba(108,99,255,.03)1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+.app{position:relative;z-index:1;max-width:1500px;margin:0 auto;padding:2rem;}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem;padding-bottom:1.5rem;border-bottom:1px solid var(--bd);}
+.logo{display:flex;align-items:center;gap:.75rem;}
+.logo-icon{width:42px;height:42px;background:linear-gradient(135deg,var(--ac),var(--ac2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;}
+.logo h1{font-family:'Syne',sans-serif;font-weight:800;font-size:1.5rem;background:linear-gradient(135deg,#fff 30%,var(--ac));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.logo sub{font-size:.65rem;color:var(--mu);display:block;-webkit-text-fill-color:var(--mu);}
+.spill{display:flex;align-items:center;gap:.5rem;padding:.4rem 1rem;border-radius:100px;border:1px solid var(--bd);font-size:.95rem;color:var(--mu);background:var(--s);}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--mu);transition:all .3s;}
+.dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok);}
+.dot.err{background:var(--ac2);}
+.layout{display:grid;grid-template-columns:390px 1fr;gap:1.5rem;align-items:start;}
+.panel{background:var(--s);border:1px solid var(--bd);border-radius:14px;padding:1.5rem;}
+.pt{font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ac);margin-bottom:1.2rem;display:flex;align-items:center;gap:.5rem;}
+.field{margin-bottom:1rem;}
+.field label{display:block;font-size:.9rem;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem;}
+select,input[type=number],textarea{width:100%;background:var(--s2);border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-family:'DM Mono',monospace;font-size:1rem;padding:.65rem .9rem;outline:none;transition:border-color .2s,box-shadow .2s;appearance:none;}
+select:focus,input:focus,textarea:focus{border-color:var(--ac);box-shadow:0 0 0 3px rgba(108,99,255,.12);}
+textarea{resize:vertical;min-height:80px;line-height:1.55;}
+.chip-grid{display:flex;flex-wrap:wrap;gap:.4rem;}
+.chip{padding:.35rem .75rem;border-radius:6px;border:1px solid var(--bd);background:var(--s2);color:var(--mu);font-family:'DM Mono',monospace;font-size:.95rem;cursor:pointer;transition:all .18s;user-select:none;}
+.chip:hover{border-color:var(--ac);color:var(--tx);}
+.chip.on{border-color:var(--ac);background:rgba(108,99,255,.15);color:var(--tx);}
+.dir-row{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;}
+.dirbtn{padding:.55rem;border-radius:8px;border:1px solid var(--bd);background:var(--s2);color:var(--mu);font-family:'DM Mono',monospace;font-size:.95rem;cursor:pointer;text-align:center;transition:all .18s;}
+.dirbtn.on{border-color:var(--ac);background:rgba(108,99,255,.15);color:var(--tx);}
+.divider{height:1px;background:var(--bd);margin:1rem 0;}
+.gen-btn{width:100%;padding:.9rem;border:none;border-radius:10px;background:linear-gradient(135deg,var(--ac),#8b5cf6);color:#fff;font-family:'Syne',sans-serif;font-weight:700;font-size:.92rem;cursor:pointer;letter-spacing:.05em;transition:all .2s;margin-top:1rem;}
+.gen-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 24px rgba(108,99,255,.4);}
+.gen-btn:disabled{opacity:.5;cursor:not-allowed;}
+.brow{display:flex;align-items:center;justify-content:center;gap:.5rem;}
+.prog{display:none;margin-top:1rem;}
+.prog.show{display:block;}
+.prog-track{height:3px;background:var(--bd);border-radius:99px;overflow:hidden;margin-bottom:.5rem;}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--ac),var(--ac2));transition:width .35s;width:0%;}
+.prog-txt{font-size:.9rem;color:var(--mu);}
+.co-pool{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.5rem;min-height:28px;}
+.co-tag{display:flex;align-items:center;gap:.35rem;padding:.25rem .65rem;border-radius:6px;font-size:.88rem;border:1px solid;}
+.co-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.right{display:flex;flex-direction:column;gap:1.2rem;}
+.toolbar{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;padding:1rem 1.2rem;background:var(--s);border:1px solid var(--bd);border-radius:14px;}
+.tbarbtn{display:flex;align-items:center;gap:.4rem;padding:.45rem .9rem;border-radius:8px;border:1px solid var(--bd);background:var(--s2);color:var(--tx);font-family:'DM Mono',monospace;font-size:.95rem;cursor:pointer;transition:all .18s;white-space:nowrap;}
+.tbarbtn:hover{border-color:var(--ac);color:var(--ac);}
+.tbarbtn:disabled{opacity:.35;cursor:not-allowed;}
+.tbarbtn.red:hover{border-color:var(--ac2);color:var(--ac2);}
+.cnt{margin-left:auto;font-size:.95rem;color:var(--mu);}
+.igrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:1rem;}
+.icard{background:var(--s);border:1px solid var(--bd);border-radius:10px;overflow:hidden;transition:all .18s;position:relative;}
+.icard:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.4);}
+.icard.sel{background:rgba(108,99,255,.07);}
+.chk{position:absolute;top:.6rem;right:.6rem;width:20px;height:20px;border-radius:50%;border:2px solid var(--bd);background:var(--s2);display:flex;align-items:center;justify-content:center;font-size:.6rem;transition:all .18s;z-index:2;cursor:pointer;}
+.icard.sel .chk{background:var(--ac);border-color:var(--ac);color:#fff;}
+.card-accent{height:4px;width:100%;}
+.iprev{width:100%;aspect-ratio:210/297;background:#fff;overflow:hidden;cursor:pointer;}
+.iprev iframe{width:100%;height:100%;border:none;pointer-events:none;}
+.imeta{padding:.65rem .8rem;border-top:1px solid var(--bd);}
+.inum{font-size:1rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.isub{font-size:.88rem;color:var(--mu);margin-top:1px;}
+.ibtns{display:flex;gap:.4rem;padding:.45rem .75rem;border-top:1px solid var(--bd);}
+.ibtn{flex:1;padding:.3rem;border-radius:6px;border:1px solid var(--bd);background:transparent;color:var(--mu);font-size:.88rem;font-family:'DM Mono',monospace;cursor:pointer;transition:all .15s;text-align:center;}
+.ibtn:hover{border-color:var(--ac);color:var(--ac);}
+.ibtn.del:hover{border-color:var(--ac2);color:var(--ac2);}
+.empty{padding:4rem 2rem;text-align:center;color:var(--mu);border:1px dashed var(--bd);border-radius:12px;}
+.empty .ei{font-size:3rem;margin-bottom:1rem;opacity:.35;}
+.empty p{font-size:.78rem;line-height:1.7;}
+.logbox{background:var(--s);border:1px solid var(--bd);border-radius:14px;overflow:hidden;}
+.logtop{padding:.75rem 1.2rem;border-bottom:1px solid var(--bd);}
+.loginner{padding:.75rem 1.2rem;max-height:160px;overflow-y:auto;}
+.ll{font-size:.9rem;color:var(--mu);line-height:1.9;}
+.ll.ok{color:var(--ok);}
+.ll.err{color:var(--ac2);}
+.ll.info{color:var(--ac);}
+@keyframes spin{to{transform:rotate(360deg);}}
+.sp{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--s);}
+::-webkit-scrollbar-thumb{background:var(--bd);border-radius:99px;}
+@media(max-width:920px){.layout{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🧾</div>
+      <div><h1>InvoiceForge <span style="font-size:.7em;opacity:.5">v2</span></h1><sub>Smart multi-company AI invoice generator · Ollama</sub></div>
+    </div>
+    <div class="spill"><div class="dot" id="dot"></div><span id="sTxt">Connecting...</span></div>
+  </header>
+
+  <div class="layout">
+    <div class="panel">
+      <div class="pt">⚙ Configuration</div>
+
+      <div class="field">
+        <label>Ollama Model</label>
+        <select id="modelSel"><option>Loading...</option></select>
+      </div>
+
+      <div class="field">
+        <label>Invoice Templates <span style="color:var(--mu);font-size:.6rem;">(multi-select)</span></label>
+        <div class="chip-grid" id="tmplChips">
+          <div class="chip on" data-t="corporate">🏢 Corporate</div>
+          <div class="chip" data-t="freelance">💼 Freelance</div>
+          <div class="chip" data-t="retail">🛒 Retail</div>
+          <div class="chip" data-t="construction">🏗 Construction</div>
+          <div class="chip" data-t="medical">🏥 Medical</div>
+          <div class="chip" data-t="legal">⚖ Legal</div>
+          <div class="chip" data-t="logistics">🚛 Logistics</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Invoice Direction</label>
+        <div class="dir-row">
+          <button class="dirbtn on" data-d="issued" onclick="pickDir(this)">📤 Issued<br><span style="font-size:.6rem;opacity:.6">We sent</span></button>
+          <button class="dirbtn" data-d="received" onclick="pickDir(this)">📥 Received<br><span style="font-size:.6rem;opacity:.6">We got</span></button>
+          <button class="dirbtn" data-d="mixed" onclick="pickDir(this)">🔀 Mixed<br><span style="font-size:.6rem;opacity:.6">Both</span></button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="field">
+        <label>Number of Invoices</label>
+        <input type="number" id="cnt" value="5" min="1" max="200">
+      </div>
+
+      <div class="field">
+        <label>Additional Requirements <span style="color:var(--mu);font-size:.6rem;">(optional)</span></label>
+        <textarea id="reqs" placeholder="Language: French&#10;Country: France&#10;Services: web design&#10;Amount range: 500–5000 EUR&#10;Industry: tech startup..."></textarea>
+      </div>
+
+      <div class="field">
+        <label>Company Pool <span style="color:var(--mu);font-size:.6rem;">(generated before invoices)</span></label>
+        <div class="co-pool" id="coPool"><span style="font-size:.65rem;color:var(--mu);">Will appear after generation starts...</span></div>
+      </div>
+
+      <button class="gen-btn" id="genBtn" onclick="go()">
+        <div class="brow"><span>⚡</span> Generate Invoices</div>
+      </button>
+
+      <div class="prog" id="prog">
+        <div class="prog-track"><div class="prog-fill" id="fill"></div></div>
+        <div class="prog-txt" id="ptxt">Preparing...</div>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="toolbar">
+        <div class="pt" style="margin-bottom:0">📄 Generated Invoices</div>
+        <button class="tbarbtn" id="bSA" onclick="selAll()" disabled>☑ All</button>
+        <button class="tbarbtn" id="bDS" onclick="dlSel()" disabled>⬇ Download Selected</button>
+        <button class="tbarbtn" id="bDA" onclick="dlAll()" disabled>📦 ZIP All</button>
+        <button class="tbarbtn red" id="bDel" onclick="delSel()" disabled>✕ Remove Selected</button>
+        <div class="cnt" id="cntB">0 invoices</div>
+      </div>
+
+      <div id="grid">
+        <div class="empty"><div class="ei">📭</div><p>No invoices yet.<br>Configure your settings and hit Generate.</p></div>
+      </div>
+
+      <div class="logbox">
+        <div class="logtop"><div class="pt" style="margin-bottom:0;font-size:.72rem;">📋 Activity Log</div></div>
+        <div class="loginner" id="log"><div class="ll info">System ready. Waiting for Ollama...</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const { jsPDF } = window.jspdf;
+const BASE = 'http://localhost:11434';
+
+let invoices = [];
+let busy = false;
+let direction = 'issued';
+let companyPool = [];
+
+const COLOR_THEMES = [
+  { h:[30,50,120],  l:[220,225,240] },
+  { h:[40,120,80],  l:[220,245,230] },
+  { h:[180,60,40],  l:[250,235,232] },
+  { h:[130,85,20],  l:[245,238,220] },
+  { h:[20,90,160],  l:[220,235,250] },
+  { h:[60,45,90],   l:[238,234,248] },
+  { h:[15,80,100],  l:[220,242,248] },
+  { h:[160,40,80],  l:[248,225,235] },
+  { h:[80,100,20],  l:[235,245,220] },
+  { h:[100,50,140], l:[240,230,252] },
+  { h:[20,120,110], l:[220,248,245] },
+  { h:[150,90,30],  l:[248,240,225] },
+  { h:[60,80,150],  l:[228,232,252] },
+  { h:[120,40,40],  l:[252,228,228] },
+];
+
+const rgb2hex = ([r,g,b]) => '#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+
+const T = {
+  corporate:    { label:'Corporate',    icon:'🏢', sys:'corporate B2B professional services (consulting, software, finance)' },
+  freelance:    { label:'Freelance',    icon:'💼', sys:'independent freelancer or small agency (design, dev, writing, marketing)' },
+  retail:       { label:'Retail',       icon:'🛒', sys:'retail or e-commerce business selling physical products' },
+  construction: { label:'Construction', icon:'🏗', sys:'construction, renovation, or contracting company' },
+  medical:      { label:'Medical',      icon:'🏥', sys:'medical, dental, or healthcare provider' },
+  legal:        { label:'Legal',        icon:'⚖',  sys:'law firm, legal consultancy, or compliance services' },
+  logistics:    { label:'Logistics',    icon:'🚛', sys:'freight, shipping, or logistics company' },
+};
+
+// ── MODEL HELPERS ─────────────────────────────────────────────────────────────
+function isQwen(m){ return (m||'').toLowerCase().includes('qwen'); }
+
+function stripThink(t){
+  return (t||'')
+    .replace(/<think>[\s\S]*?<\/think>/gi,'')
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi,'')
+    .trim();
+}
+
+async function chat(model, system, user, useJsonFormat=true){
+  const body = {
+    model,
+    stream: false,
+    messages: [
+      { role:'system', content:system },
+      { role:'user',   content:user   }
+    ],
+    options:{ temperature:0.9, num_predict:3000 }
+  };
+  // format:'json' helps most models but can confuse some with arrays — caller decides
+  if(useJsonFormat) body.format = 'json';
+  if(isQwen(model)) body.think = false;
+
+  const r = await fetch(`${BASE}/api/chat`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  if(!r.ok) throw new Error(`Ollama HTTP ${r.status}: ${await r.text()}`);
+  const data = await r.json();
+  return stripThink(data.message?.content || '');
+}
+
+// ── JSON PARSING — 3 fallback strategies ─────────────────────────────────────
+function parseObj(raw){
+  const s = stripThink(raw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim());
+  const a=s.indexOf('{'), b=s.lastIndexOf('}');
+  if(a<0||b<0) return null;
+  try{ return JSON.parse(s.slice(a,b+1)); }catch{ return null; }
+}
+
+function parseArr(raw){
+  const s = stripThink(raw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim());
+  const a=s.indexOf('['), b=s.lastIndexOf(']');
+  if(a<0||b<0) return null;
+  try{ return JSON.parse(s.slice(a,b+1)); }catch{ return null; }
+}
+
+function extractObjs(raw){
+  const s = stripThink(raw);
+  const objs=[]; let depth=0, start=-1;
+  for(let i=0;i<s.length;i++){
+    if(s[i]==='{'){if(depth===0)start=i;depth++;}
+    else if(s[i]==='}'){
+      depth--;
+      if(depth===0&&start>=0){
+        try{objs.push(JSON.parse(s.slice(start,i+1)));}catch(e){}
+        start=-1;
+      }
+    }
+  }
+  return objs.length ? objs : null;
+}
+
+// ── OLLAMA INIT ───────────────────────────────────────────────────────────────
+async function loadModels(){
+  try{
+    const r = await fetch(`${BASE}/api/tags`);
+    const models = ((await r.json()).models||[]).sort((a,b)=>{
+      const aq=a.name.toLowerCase().includes('qwen'), bq=b.name.toLowerCase().includes('qwen');
+      if(aq&&!bq) return -1; if(!aq&&bq) return 1; return a.name.localeCompare(b.name);
+    });
+    const sel=document.getElementById('modelSel');
+    const prev=sel.value; // remember whatever user had selected
+    sel.innerHTML=models.map(m=>`<option value="${m.name}">${m.name}</option>`).join('');
+    if(prev && models.some(m=>m.name===prev)) sel.value=prev;
+    const active=sel.options[sel.selectedIndex]?.value||'';
+    setStatus('on',`Ollama · ${models.length} models`);
+    lg(`Loaded ${models.length} model(s). Active: ${active}`,'ok');
+  }catch(e){
+    setStatus('err','Ollama unreachable');
+    document.getElementById('modelSel').innerHTML='<option value="">Cannot connect to Ollama</option>';
+    lg('Cannot reach Ollama at localhost:11434 — is it running?','err');
+  }
+}
+
+// ── COMPANY POOL GENERATION ───────────────────────────────────────────────────
+async function generateCompanyPool(model, count, selectedTemplates, extra){
+  const n = Math.min(count, 7);
+  const typeHints = selectedTemplates.map(t=>T[t].sys).join('; ');
+  const extraPart = extra.trim() ? `\nContext: ${extra}` : '';
+
+  // Ask for object wrapper — safer than bare array with format:json
+  const system = `You are a business data generator. Output ONLY valid JSON. No markdown, no code fences, no prose. Start with { end with }.`;
+  const user =
+`Create ${n} fictional companies, diverse industries and countries.
+Industry types to vary across: ${typeHints}.${extraPart}
+
+Respond with ONLY this JSON (fill in real-looking fake data):
+{
+  "companies": [
+    {
+      "name": "Acme Solutions Ltd",
+      "shortName": "Acme",
+      "address": "12 Baker Street",
+      "city": "London",
+      "country": "United Kingdom",
+      "email": "billing@acme.co.uk",
+      "phone": "+44 20 7946 0958",
+      "taxId": "GB123456789",
+      "industry": "IT Consulting",
+      "iban": "GB29 NWBK 6016 1331 9268 19"
+    }
+  ]
+}
+The array must have exactly ${n} items. Each must have a different country and industry.`;
+
+  lg(`Calling model to generate ${n} companies...`, 'info');
+  const raw = await chat(model, system, user, true);
+  lg(`Raw company response (200ch): ${raw.substring(0,200)}`, '');
+
+  // Strategy 1: object with .companies key
+  let companies = null;
+  const obj = parseObj(raw);
+  if(obj){
+    // find first array value
+    const arrVal = obj.companies || obj.data || obj.list || Object.values(obj).find(v=>Array.isArray(v)&&v.length);
+    if(Array.isArray(arrVal) && arrVal.length) companies = arrVal;
+  }
+
+  // Strategy 2: bare array
+  if(!companies){
+    const arr = parseArr(raw);
+    if(Array.isArray(arr) && arr.length) companies = arr;
+  }
+
+  // Strategy 3: extract multiple objects from response text
+  if(!companies){
+    const objs = extractObjs(raw);
+    // Filter out wrapper objects, keep ones that look like companies (have 'name' field)
+    if(objs){
+      const coObjs = objs.filter(o => o.name && (o.city || o.email || o.country));
+      if(coObjs.length) companies = coObjs;
+      else if(objs.length) {
+        // Maybe it's wrapped — dig one level
+        for(const o of objs){
+          const inner = Object.values(o).find(v=>Array.isArray(v)&&v.length&&v[0].name);
+          if(inner){ companies = inner; break; }
+        }
+      }
+    }
+  }
+
+  if(!companies || !companies.length){
+    lg(`FULL RAW RESPONSE: ${raw}`, 'err');
+    throw new Error('Could not parse company pool from model response. Check log above.');
+  }
+
+  lg(`Parsed ${companies.length} companies OK`, 'ok');
+
+  // Normalize fields with fallbacks
+  return companies.slice(0, n).map((co, i) => ({
+    name:      co.name       || `Company ${i+1}`,
+    shortName: co.shortName  || co.short_name || (co.name||'').split(' ')[0] || `Co${i+1}`,
+    address:   co.address    || '1 Main Street',
+    city:      co.city       || 'New York',
+    country:   co.country    || 'USA',
+    email:     co.email      || `billing@company${i+1}.com`,
+    phone:     co.phone      || '+1 555 000 0000',
+    taxId:     co.taxId      || co.tax_id || co.vat_number || co.vat || `TAX${i+1}`,
+    industry:  co.industry   || 'General Services',
+    iban:      co.iban       || co.bank_account || co.bankAccount || 'N/A',
+    colorIdx:  i % COLOR_THEMES.length,
+  }));
+}
+
+function renderCompanyPool(pool){
+  const el = document.getElementById('coPool');
+  el.innerHTML = pool.map(co => {
+    const theme = COLOR_THEMES[co.colorIdx];
+    const hex = rgb2hex(theme.h);
+    const bg = `rgba(${theme.h[0]},${theme.h[1]},${theme.h[2]},.12)`;
+    return `<div class="co-tag" style="border-color:${hex};background:${bg};color:${hex}">
+      <div class="co-dot" style="background:${hex}"></div>${co.shortName||co.name}
+    </div>`;
+  }).join('');
+}
+
+// ── PLAN ──────────────────────────────────────────────────────────────────────
+// Build invoice assignment plan, sorted so same company's invoices are consecutive
+function buildPlan(count, pool, templates, dir){
+  const plan=[];
+  for(let i=0;i<count;i++){
+    const coIdx = i % pool.length;
+    const tmpl  = templates[i % templates.length];
+    const isIssued = dir==='issued' ? true : dir==='received' ? false : (i%2===0);
+    plan.push({ coIdx, tmpl, isIssued, seq:Math.floor(i/pool.length) });
+  }
+  // Group by company so PDFs of same company are consecutive
+  plan.sort((a,b) => a.coIdx - b.coIdx || a.seq - b.seq);
+  return plan;
+}
+
+// ── INVOICE GENERATION ────────────────────────────────────────────────────────
+async function generateInvoice(model, planItem, pool, extra, serial){
+  const { coIdx, tmpl, isIssued } = planItem;
+  const co = pool[coIdx];
+  const tInfo = T[tmpl];
+  const extraPart = extra.trim() ? `\nUser requirements: ${extra}` : '';
+  const invNum = `INV-${String(serial).padStart(5,'0')}`;
+
+  const senderLabel    = isIssued ? 'the SELLER/ISSUER' : 'a VENDOR/SUPPLIER (fictional, different company)';
+  const recipientLabel = isIssued ? 'a CLIENT (fictional, different company)' : 'the BUYER (our company)';
+  const fixedCo        = isIssued ? 'sender' : 'recipient';
+
+  const system = `You are an invoice data generator. Output ONLY valid JSON. No markdown, no code fences, no prose. Output must start with { and end with }.`;
+  const user =
+`Generate ONE realistic ${tInfo.label} invoice.
+Invoice number: ${invNum} (use exactly this)
+Serial context: invoice #${serial} — make all amounts, item descriptions, dates, and counterparty DIFFERENT from any other invoice. Randomize totals significantly.
+
+The ${fixedCo} is our FIXED company:
+  Name: ${co.name}
+  Address: ${co.address}, ${co.city}, ${co.country}
+  Email: ${co.email} | Phone: ${co.phone}
+  Tax ID: ${co.taxId} | IBAN: ${co.iban}
+
+The other party should be a completely FICTIONAL company with its own realistic details.
+Template: ${tInfo.label} (${tInfo.sys})${extraPart}
+
+Items should be realistic for a ${tInfo.label} business. Vary quantities, descriptions, and unit prices each time.
+
+Return ONLY this JSON (all fields required, no extras):
+{
+  "invoiceNumber": "${invNum}",
+  "date": "YYYY-MM-DD",
+  "dueDate": "YYYY-MM-DD",
+  "direction": "${isIssued?'issued':'received'}",
+  "sender": { "company":"","address":"","city":"","country":"","email":"","phone":"","taxId":"" },
+  "recipient": { "company":"","address":"","city":"","country":"","email":"","attn":"" },
+  "items": [{ "description":"","qty":1,"unit":"pcs","unitPrice":0.00,"total":0.00 }],
+  "subtotal": 0.00,
+  "taxRate": 0.20,
+  "taxAmount": 0.00,
+  "total": 0.00,
+  "currency": "USD",
+  "notes": "",
+  "paymentInfo": ""
+}`;
+
+  const raw = await chat(model, system, user, true);
+  return parseObj(raw);
+}
+
+// ── MAIN ──────────────────────────────────────────────────────────────────────
+async function go(){
+  if(busy) return;
+  const model = document.getElementById('modelSel').value;
+  if(!model){ lg('No model selected','err'); return; }
+  const templates = [...document.querySelectorAll('.chip.on')].map(c=>c.dataset.t);
+  if(!templates.length){ lg('Select at least one template','err'); return; }
+  const count = Math.max(1, parseInt(document.getElementById('cnt').value)||1);
+  const extra = document.getElementById('reqs').value;
+
+  busy=true; setBusy(true); showProg(true);
+
+  try{
+    // Phase 1: company pool
+    setProg(0, count+1, 'Phase 1/2 — Generating company profiles...');
+    companyPool = await generateCompanyPool(model, count, templates, extra);
+    renderCompanyPool(companyPool);
+    lg(`✓ Companies: ${companyPool.map(c=>c.shortName).join(', ')}`, 'ok');
+
+    // Phase 2: invoices
+    const plan = buildPlan(count, companyPool, templates, direction);
+    let serial = invoices.length + 1;
+
+    for(let i=0; i<plan.length; i++){
+      const p = plan[i];
+      const co = companyPool[p.coIdx];
+      setProg(i+1, count+1, `Phase 2/2 — Invoice ${i+1}/${count} · ${co.shortName} · ${T[p.tmpl].label} · ${p.isIssued?'issued':'received'}`);
+
+      try{
+        const data = await generateInvoice(model, p, companyPool, extra, serial);
+        if(!data){ lg(`[${i+1}] JSON parse failed`, 'err'); serial++; continue; }
+
+        // Ensure invoice number uniqueness even if model ignores it
+        data.invoiceNumber = `INV-${String(serial).padStart(5,'0')}`;
+
+        const pdf  = makePDF(data, p.tmpl, co.colorIdx, p.isIssued);
+        const blob = pdf.output('blob');
+        const url  = URL.createObjectURL(blob);
+        const uid  = `${Date.now()}-${i}-${Math.random().toString(36).slice(2,6)}`;
+
+        invoices.push({ data, blob, url, tmpl:p.tmpl, coIdx:p.coIdx,
+          coColor: rgb2hex(COLOR_THEMES[co.colorIdx].h),
+          isIssued: p.isIssued, uid, sel:false });
+        serial++;
+        render();
+        lg(`[${i+1}/${count}] ✓ ${data.invoiceNumber} · ${data.sender?.company} → ${data.recipient?.company} · ${data.currency} ${data.total}`, 'ok');
+      }catch(e){
+        lg(`[${i+1}] Error: ${e.message}`, 'err');
+        serial++;
+      }
+    }
+  }catch(e){
+    lg(`Generation failed: ${e.message}`, 'err');
+  }
+
+  setProg(count+1, count+1, 'Complete!');
+  setTimeout(()=>showProg(false), 2000);
+  busy=false; setBusy(false); refreshBar();
+}
+
+// ── PDF BUILDER ───────────────────────────────────────────────────────────────
+function makePDF(d, tmplKey, colorIdx, isIssued){
+  const doc = new jsPDF({ format:'a4', unit:'mm' });
+  const W=210, m=15;
+  const theme = COLOR_THEMES[colorIdx!==undefined ? colorIdx : 0];
+  const [hr,hg,hb] = theme.h;
+  const [ar,ag,ab] = theme.l;
+  const n=v=>parseFloat(v)||0;
+  const f=v=>n(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const cur = d.currency||'USD';
+  const tLabel = (T[tmplKey]||T.corporate).label;
+  const dirTxt = isIssued ? '▲ ISSUED' : '▼ RECEIVED';
+
+  // Header
+  doc.setFillColor(hr,hg,hb); doc.rect(0,0,W,38,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(16); doc.setFont('helvetica','bold');
+  doc.text((d.sender?.company||'').toUpperCase().substring(0,40), m, 14);
+  doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+  doc.text(`${tLabel.toUpperCase()} INVOICE  ·  ${dirTxt}`, m, 22);
+  doc.setFontSize(11); doc.setFont('helvetica','bold');
+  doc.text(d.invoiceNumber||'INV-?', W-m, 14, {align:'right'});
+  doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+  doc.text(`Issued: ${d.date||''}`, W-m, 22, {align:'right'});
+  doc.text(`Due: ${d.dueDate||''}`, W-m, 28, {align:'right'});
+
+  // From / To
+  let y=46;
+  doc.setFillColor(ar,ag,ab); doc.roundedRect(m,y,86,42,2,2,'F');
+  doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(hr,hg,hb);
+  doc.text('FROM', m+4, y+7);
+  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(20,20,32);
+  doc.text((d.sender?.company||'').substring(0,36), m+4, y+13);
+  doc.setFontSize(7); doc.setFont('helvetica','normal');
+  [d.sender?.address, `${d.sender?.city||''}, ${d.sender?.country||''}`, d.sender?.email, d.sender?.phone, d.sender?.taxId?`Tax: ${d.sender.taxId}`:null]
+    .filter(Boolean).forEach((l,i)=>doc.text((l||'').substring(0,42),m+4,y+19+i*4.5));
+
+  doc.setFillColor(248,248,252); doc.roundedRect(W-m-86,y,86,42,2,2,'F');
+  doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(hr,hg,hb);
+  doc.text('BILL TO', W-m-82, y+7);
+  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(20,20,32);
+  doc.text((d.recipient?.company||'').substring(0,36), W-m-82, y+13);
+  doc.setFontSize(7); doc.setFont('helvetica','normal');
+  [d.recipient?.attn?`Attn: ${d.recipient.attn}`:null, d.recipient?.address,
+   `${d.recipient?.city||''}, ${d.recipient?.country||''}`, d.recipient?.email]
+    .filter(Boolean).forEach((l,i)=>doc.text((l||'').substring(0,42),W-m-82,y+19+i*4.5));
+
+  // Table
+  y+=50;
+  const cols=[m,94,118,144,172];
+  doc.setFillColor(hr,hg,hb); doc.rect(m,y,W-m*2,8,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(7); doc.setFont('helvetica','bold');
+  ['DESCRIPTION','QTY','UNIT','UNIT PRICE','TOTAL'].forEach((h,i)=>{
+    if(i===0) doc.text(h,cols[i]+2,y+5.2);
+    else doc.text(h,(i<4?cols[i]+(cols[i+1]-cols[i])-2:W-m-2),y+5.2,{align:'right'});
+  });
+  y+=8;
+
+  (Array.isArray(d.items)?d.items:[]).forEach((it,i)=>{
+    if(y>252) return;
+    if(i%2===0){doc.setFillColor(248,248,252);doc.rect(m,y,W-m*2,7,'F');}
+    doc.setTextColor(20,20,32); doc.setFontSize(7); doc.setFont('helvetica','normal');
+    doc.text((it.description||'').substring(0,56),cols[0]+2,y+4.8);
+    doc.text(String(it.qty??''),cols[1]+(cols[2]-cols[1])-2,y+4.8,{align:'right'});
+    doc.text(String(it.unit||''),cols[2]+(cols[3]-cols[2])-2,y+4.8,{align:'right'});
+    doc.text(`${cur} ${f(it.unitPrice)}`,cols[3]+(cols[4]-cols[3])-2,y+4.8,{align:'right'});
+    doc.text(`${cur} ${f(it.total)}`,W-m-2,y+4.8,{align:'right'});
+    doc.setDrawColor(220,220,230); doc.line(m,y+7,W-m,y+7);
+    y+=7;
+  });
+
+  y+=6;
+  doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,100);
+  doc.text('Subtotal',W-m-54,y); doc.text(`${cur} ${f(d.subtotal)}`,W-m,y,{align:'right'}); y+=6;
+  doc.text(`Tax (${Math.round(n(d.taxRate)*100)}%)`,W-m-54,y); doc.text(`${cur} ${f(d.taxAmount)}`,W-m,y,{align:'right'}); y+=6;
+  doc.setFillColor(hr,hg,hb); doc.roundedRect(W-m-74,y-1,74,9,2,2,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(8.5); doc.setFont('helvetica','bold');
+  doc.text('TOTAL',W-m-54,y+5.5);
+  doc.text(`${cur} ${f(d.total)}`,W-m-2,y+5.5,{align:'right'});
+
+  y+=18;
+  if(d.paymentInfo){
+    doc.setFillColor(ar,ag,ab); doc.roundedRect(m,y,W-m*2,18,2,2,'F');
+    doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(hr,hg,hb);
+    doc.text('PAYMENT INFORMATION',m+4,y+5.5);
+    doc.setFont('helvetica','normal'); doc.setTextColor(30,30,45); doc.setFontSize(7);
+    doc.text(doc.splitTextToSize(d.paymentInfo,W-m*2-8).slice(0,2),m+4,y+11);
+    y+=22;
+  }
+  if(d.notes){
+    doc.setTextColor(110,110,130); doc.setFontSize(7); doc.setFont('helvetica','italic');
+    doc.text(doc.splitTextToSize(d.notes,W-m*2).slice(0,3),m,y);
+  }
+
+  // Footer
+  doc.setFillColor(hr,hg,hb); doc.rect(0,285,W,12,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+  doc.text(`${d.sender?.company||''} · ${d.sender?.email||''}`,W/2,291,{align:'center'});
+  doc.text(d.invoiceNumber||'',W-m,291,{align:'right'});
+  return doc;
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function render(){
+  const g=document.getElementById('grid');
+  if(!invoices.length){
+    g.innerHTML=`<div class="empty"><div class="ei">📭</div><p>No invoices yet.</p></div>`;
+    refreshBar(); return;
+  }
+  const wrap=document.createElement('div'); wrap.className='igrid';
+  invoices.forEach((inv,idx)=>{
+    const c=document.createElement('div');
+    c.className='icard'+(inv.sel?' sel':'');
+    c.style.borderColor=inv.sel?'var(--ac)':inv.coColor;
+    const dirC=inv.isIssued?'#4ade80':'#fb923c';
+    const dirI=inv.isIssued?'▲':'▼';
+    c.innerHTML=`
+      <div class="card-accent" style="background:${inv.coColor}"></div>
+      <div class="chk" onclick="toggle(${idx})">${inv.sel?'✓':''}</div>
+      <div class="iprev" onclick="toggle(${idx})"><iframe src="${inv.url}#toolbar=0&navpanes=0" loading="lazy"></iframe></div>
+      <div class="imeta">
+        <div class="inum">${inv.data.invoiceNumber||'INV-?'} <span style="color:${dirC};font-size:.6rem">${dirI}</span></div>
+        <div class="isub">${inv.data.sender?.company||'—'}</div>
+        <div class="isub">→ ${inv.data.recipient?.company||'—'}</div>
+        <div class="isub" style="margin-top:.2rem">${(T[inv.tmpl]||{}).label||''} · ${inv.data.currency} ${(parseFloat(inv.data.total)||0).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+      </div>
+      <div class="ibtns">
+        <button class="ibtn" onclick="dlOne(${idx})">⬇ DL</button>
+        <button class="ibtn del" onclick="rmOne(${idx})">✕</button>
+      </div>`;
+    wrap.appendChild(c);
+  });
+  g.innerHTML=''; g.appendChild(wrap); refreshBar();
+}
+
+// ── ACTIONS ───────────────────────────────────────────────────────────────────
+function toggle(i){invoices[i].sel=!invoices[i].sel;render();}
+function selAll(){const a=invoices.every(i=>i.sel);invoices.forEach(i=>i.sel=!a);render();}
+
+function dlOne(i){
+  const inv=invoices[i];
+  makePDF(inv.data,inv.tmpl,inv.coIdx,inv.isIssued).save(`${inv.data.invoiceNumber}.pdf`);
+}
+
+async function dlSel(){
+  const sel=invoices.filter(i=>i.sel);
+  if(!sel.length) return;
+  if(sel.length===1){dlOne(invoices.indexOf(sel[0]));return;}
+  const zip=new JSZip();
+  sel.forEach(inv=>{
+    const fname=`${inv.data.invoiceNumber}-${inv.uid.slice(-5)}.pdf`;
+    zip.file(fname, makePDF(inv.data,inv.tmpl,inv.coIdx,inv.isIssued).output('blob'));
+  });
+  dlBlob(await zip.generateAsync({type:'blob'}),'selected-invoices.zip');
+}
+
+async function dlAll(){
+  if(!invoices.length) return;
+  const zip=new JSZip();
+  invoices.forEach(inv=>{
+    const fname=`${inv.data.invoiceNumber}-${inv.uid.slice(-5)}.pdf`;
+    zip.file(fname, makePDF(inv.data,inv.tmpl,inv.coIdx,inv.isIssued).output('blob'));
+  });
+  dlBlob(await zip.generateAsync({type:'blob'}),`invoices-${Date.now()}.zip`);
+}
+
+function delSel(){invoices=invoices.filter(i=>!i.sel);render();}
+function rmOne(i){invoices.splice(i,1);render();}
+function dlBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();}
+
+function refreshBar(){
+  const hasSel=invoices.some(i=>i.sel),hasAny=invoices.length>0;
+  document.getElementById('bSA').disabled=!hasAny;
+  document.getElementById('bDS').disabled=!hasSel;
+  document.getElementById('bDA').disabled=!hasAny;
+  document.getElementById('bDel').disabled=!hasSel;
+  document.getElementById('cntB').textContent=`${invoices.length} invoice${invoices.length!==1?'s':''}`;
+}
+
+// ── UI ────────────────────────────────────────────────────────────────────────
+document.getElementById('tmplChips').addEventListener('click', e=>{
+  const chip=e.target.closest('.chip'); if(!chip) return;
+  const on=document.querySelectorAll('.chip.on');
+  if(chip.classList.contains('on')&&on.length===1) return;
+  chip.classList.toggle('on');
+});
+
+function pickDir(btn){
+  document.querySelectorAll('.dirbtn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on'); direction=btn.dataset.d;
+}
+function setBusy(v){
+  const btn=document.getElementById('genBtn');
+  btn.disabled=v;
+  btn.innerHTML=v?'<div class="brow"><div class="sp"></div> Generating...</div>':'<div class="brow"><span>⚡</span> Generate Invoices</div>';
+}
+function showProg(v){document.getElementById('prog').className='prog'+(v?' show':'');}
+function setProg(done,total,txt){document.getElementById('fill').style.width=(total?Math.round(done/total*100):0)+'%';document.getElementById('ptxt').textContent=txt;}
+function setStatus(t,txt){document.getElementById('dot').className='dot '+(t==='on'?'on':t==='err'?'err':'');document.getElementById('sTxt').textContent=txt;}
+function lg(msg,type=''){
+  const p=document.getElementById('log');
+  const d=document.createElement('div');d.className='ll '+type;
+  d.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;
+  p.appendChild(d); p.scrollTop=p.scrollHeight;
+}
+
+loadModels();
+</script>
+</body>
+</html>
